@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Chromatic Instrument</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- 左半分：コードボタン -->
+  <div id="left-panel">
+    <h2>コード</h2>
+
+    <div class="code-row">
+      <button class="code-btn" data-code="maj">Maj</button>
+      <button class="code-btn" data-code="min">Min</button>
+      <button class="code-btn" data-code="dim">Dim</button>
+      <button class="code-btn" data-code="aug">Aug</button>
+    </div>
+
+    <div class="code-row">
+      <button class="code-btn" data-code="7">7</button>
+      <button class="code-btn" data-code="maj7">Maj7</button>
+      <button class="code-btn" data-code="m7">m7</button>
+      <button class="code-btn" data-code="m7b5">m7b5</button>
+    </div>
+
+    <div class="code-row">
+      <button class="code-btn" data-code="add9">Add9</button>
+      <button class="code-btn" data-code="add11">Add11</button>
+      <button class="code-btn" data-code="9">9</button>
+      <button class="code-btn" data-code="11">11</button>
+    </div>
+
+    <div class="code-row">
+      <button class="code-btn" data-code="13">13</button>
+      <button class="code-btn" data-code="slash">Slash</button>
+    </div>
+
+    <div id="code-status">単音モード</div>
+  </div>
+
+  <!-- 右半分：クロマティックサークル -->
+  <div id="right-panel">
+    <div id="circle">
+      <!-- JSで音階ボタン＆ラベルを生成 -->
+    </div>
+  </div>
+
+</div>
+
+<script src="main.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js');
+  }
+</script>
+
+</body>
+</html>
