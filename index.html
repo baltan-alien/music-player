@@ -1,63 +1,64 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Chromatic Instrument</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
 </head>
 <body>
+  <div id="app">
+    <aside id="left-panel" aria-label="コードパネル">
+      <h1>コード</h1>
 
-<div id="app">
+      <div class="code-grid" role="group" aria-label="コード一覧">
+        <button class="code-btn" data-code="maj">Maj</button>
+        <button class="code-btn" data-code="min">Min</button>
+        <button class="code-btn" data-code="dim">Dim</button>
+        <button class="code-btn" data-code="aug">Aug</button>
 
-  <!-- 左半分：コードボタン -->
-  <div id="left-panel">
-    <h2>コード</h2>
+        <button class="code-btn" data-code="7">7</button>
+        <button class="code-btn" data-code="maj7">Maj7</button>
+        <button class="code-btn" data-code="m7">m7</button>
+        <button class="code-btn" data-code="m7b5">m7b5</button>
 
-    <div class="code-row">
-      <button class="code-btn" data-code="maj">Maj</button>
-      <button class="code-btn" data-code="min">Min</button>
-      <button class="code-btn" data-code="dim">Dim</button>
-      <button class="code-btn" data-code="aug">Aug</button>
-    </div>
+        <button class="code-btn" data-code="add9">Add9</button>
+        <button class="code-btn" data-code="add11">Add11</button>
+        <button class="code-btn" data-code="9">9</button>
+        <button class="code-btn" data-code="11">11</button>
 
-    <div class="code-row">
-      <button class="code-btn" data-code="7">7</button>
-      <button class="code-btn" data-code="maj7">Maj7</button>
-      <button class="code-btn" data-code="m7">m7</button>
-      <button class="code-btn" data-code="m7b5">m7b5</button>
-    </div>
+        <button class="code-btn" data-code="13">13</button>
+        <button class="code-btn" data-code="slash">Slash</button>
+        <button id="clear-code" class="code-btn">Clear</button>
+        <div id="code-status" aria-live="polite">単音モード</div>
+      </div>
+    </aside>
 
-    <div class="code-row">
-      <button class="code-btn" data-code="add9">Add9</button>
-      <button class="code-btn" data-code="add11">Add11</button>
-      <button class="code-btn" data-code="9">9</button>
-      <button class="code-btn" data-code="11">11</button>
-    </div>
-
-    <div class="code-row">
-      <button class="code-btn" data-code="13">13</button>
-      <button class="code-btn" data-code="slash">Slash</button>
-    </div>
-
-    <div id="code-status">単音モード</div>
+    <main id="right-panel" aria-label="クロマティックサークル">
+      <div id="circle" role="application" aria-label="音階サークル"></div>
+    </main>
   </div>
 
-  <!-- 右半分：クロマティックサークル -->
-  <div id="right-panel">
-    <div id="circle">
-      <!-- JSで音階ボタン＆ラベルを生成 -->
-    </div>
-  </div>
-
-</div>
-
-<script src="main.js"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js');
-  }
-</script>
-
+  <script src="main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').then(reg => {
+        // 新しい service worker が待機中なら即適用
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              // 新しいSWがインストールされたらページをリロードして新しいキャッシュを取得
+              nw.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+      });
+    }
+  </script>
 </body>
 </html>
