@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Chromatic Instrument</title>
   <link rel="stylesheet" href="style.css" />
@@ -13,25 +13,35 @@
       <h1>コード</h1>
 
       <div class="code-grid" role="group" aria-label="コード一覧">
-        <button class="code-btn" data-code="maj">Maj</button>
-        <button class="code-btn" data-code="min">Min</button>
-        <button class="code-btn" data-code="dim">Dim</button>
-        <button class="code-btn" data-code="aug">Aug</button>
+        <!-- Triads -->
+        <button class="code-btn triad" data-code="maj">Maj</button>
+        <button class="code-btn triad" data-code="min">Min</button>
+        <button class="code-btn triad" data-code="dim">Dim</button>
+        <button class="code-btn triad" data-code="aug">Aug</button>
 
-        <button class="code-btn" data-code="7">7</button>
-        <button class="code-btn" data-code="maj7">Maj7</button>
-        <button class="code-btn" data-code="m7">m7</button>
-        <button class="code-btn" data-code="m7b5">m7b5</button>
+        <!-- 7th -->
+        <button class="code-btn seventh" data-code="7">7</button>
+        <button class="code-btn seventh" data-code="maj7">Maj7</button>
+        <button class="code-btn seventh" data-code="m7">m7</button>
+        <button class="code-btn seventh" data-code="m7b5">m7b5</button>
 
-        <button class="code-btn" data-code="add9">Add9</button>
-        <button class="code-btn" data-code="add11">Add11</button>
-        <button class="code-btn" data-code="9">9</button>
-        <button class="code-btn" data-code="11">11</button>
+        <!-- Add -->
+        <button class="code-btn add" data-code="add9">Add9</button>
+        <button class="code-btn add" data-code="add11">Add11</button>
+        <button class="code-btn tension" data-code="9">9</button>
+        <button class="code-btn tension" data-code="11">11</button>
 
-        <button class="code-btn" data-code="13">13</button>
-        <button class="code-btn" data-code="slash">Slash</button>
-        <button id="clear-code" class="code-btn">Clear</button>
+        <!-- Others -->
+        <button class="code-btn tension" data-code="13">13</button>
+        <button class="code-btn slash" data-code="slash">Slash</button>
+        <button id="clear-code" class="code-btn control">Clear</button>
+
         <div id="code-status" aria-live="polite">単音モード</div>
+      </div>
+
+      <div id="mode-switch">
+        <label><input type="radio" name="soundMode" value="piano" checked> 電子ピアノ</label>
+        <label><input type="radio" name="soundMode" value="chip"> ピコピコ</label>
       </div>
     </aside>
 
@@ -44,15 +54,11 @@
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').then(reg => {
-        // 新しい service worker が待機中なら即適用
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         reg.addEventListener('updatefound', () => {
           const nw = reg.installing;
           nw.addEventListener('statechange', () => {
             if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-              // 新しいSWがインストールされたらページをリロードして新しいキャッシュを取得
               nw.postMessage({ type: 'SKIP_WAITING' });
             }
           });
