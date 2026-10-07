@@ -3,7 +3,7 @@
   "short_name": "Instrument",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#222",
-  "theme_color": "#222",
+  "background_color": "#111",
+  "theme_color": "#111",
   "icons": []
 }
