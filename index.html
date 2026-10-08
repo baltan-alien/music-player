@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#111217">
+<link rel="manifest" href="manifest.json">
+<title>Chromatic Electric Piano v4</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;position:fixed;inset:0;background:#101114;color:#fff;
+font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;touch-action:none;overscroll-behavior:none}
+body{height:var(--app-h,100vh);width:var(--app-w,100vw);display:flex;flex-direction:column}
+header{height:clamp(38px,7vh,52px);flex:0 0 clamp(38px,7vh,52px);display:flex;align-items:center;justify-content:space-between;
+padding:0 14px;background:#17181c;border-bottom:1px solid #36383e}
+h1{font-size:clamp(14px,2.5vh,18px);margin:0}.status{font-size:clamp(13px,2.3vh,16px);color:#ffd34f;font-weight:800}
+main{flex:1;min-height:0;display:grid;grid-template-columns:39% 61%;overflow:hidden}
+#left{min-width:0;background:linear-gradient(#252525,#171717);padding:clamp(6px,1.5vh,13px) clamp(7px,1.2vw,14px);
+display:flex;flex-direction:column;overflow:hidden}
+#left h2{font-size:clamp(18px,3.5vh,25px);margin:0 0 clamp(4px,1vh,9px)}
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,minmax(0,1fr));gap:clamp(4px,.8vw,8px)}
+.ch{border:0;border-radius:10px;color:transparent;font-size:0;min-width:0;min-height:0;
+background-repeat:no-repeat;background-position:center;background-size:68% 68%;touch-action:none;user-select:none;-webkit-user-select:none}
+.r{background-color:#ff7653}.g{background-color:#6bc36f}.b{background-color:#3ca6ed}.p{background-color:#ad4dc2}.y{background-color:#f4c52c}.gray{background-color:#93a5af}
+.ch.active{outline:4px solid #fff;filter:brightness(1.25);transform:scale(.97)}
+#mode{font-size:clamp(11px,2vh,14px);color:#ddd;margin:clamp(4px,1vh,8px) 0}
+#sound{display:flex;gap:clamp(9px,2vw,18px);font-size:clamp(11px,2vh,15px);white-space:nowrap}
+#sound label{display:flex;align-items:center;gap:5px}input{accent-color:#168cff;width:20px;height:20px}
+#right{position:relative;min-width:0;overflow:hidden;background:#090a0d}
+.legend{position:absolute;right:8px;top:7px;color:#737986;font-size:10px;pointer-events:none}
+#wheel{position:absolute;left:50%;top:50%;width:min(92%,calc(var(--app-h)*.82));height:min(92%,calc(var(--app-h)*.82));transform:translate(-50%,-50%)}
+.ring{position:absolute;border:1px solid #20252d;border-radius:50%;pointer-events:none}.outer{inset:8%}.middle{inset:25%}.inner{inset:39%}
+.note{position:absolute;transform:translate(-50%,-50%);width:clamp(34px,6%,58px);height:clamp(34px,6%,58px);border:0;border-radius:50%;
+color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 8px #0008;touch-action:none;user-select:none;-webkit-user-select:none}
+.note.black{filter:saturate(.55)}.note.active{outline:4px solid #fff;filter:brightness(1.4) saturate(1.2);transform:translate(-50%,-50%) scale(1.12);z-index:20}
+.note.chordlit{box-shadow:0 0 0 3px #fff6,0 6px 12px #000a}
+.label{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;
+font-weight:800;line-height:1.03;white-space:nowrap;pointer-events:none;text-shadow:0 2px 4px #000}
+.label .jp{font-size:clamp(11px,2vh,16px)}.label .en{font-size:clamp(9px,1.7vh,13px)}
+@media(max-width:700px) and (orientation:portrait){
+ main{grid-template-columns:1fr;grid-template-rows:43% 57%}
+ #wheel{width:min(92%,calc(var(--app-w)*.92));height:min(92%,calc(var(--app-w)*.92))}
+}
+</style></head>
+<body>
+<header><h1>Chromatic Electric Piano</h1><div class="status" id="status">ルート：未選択</div></header>
+<main>
+<section id="left"><h2>コード</h2><div class="grid" id="chords"></div><div id="mode">コードモード：なし</div>
+<div id="sound"><label><input type="radio" name="v" value="ep" checked>電子ピアノ</label><label><input type="radio" name="v" value="8">ピコピコ</label></div></section>
+<section id="right"><div class="legend">外周 3 OCT　中央 4 OCT　内周 5 OCT</div><div id="wheel">
+<div class="ring outer"></div><div class="ring middle"></div><div class="ring inner"></div>
+</div></section></main>
+<script>
+/* 初期表示時の実画面サイズを固定。アドレスバーの出入りで演奏画面が伸縮しない */
+function fitViewport(){
+ const w=window.visualViewport?Math.round(window.visualViewport.width):window.innerWidth;
+ const h=window.visualViewport?Math.round(window.visualViewport.height):window.innerHeight;
+ document.documentElement.style.setProperty("--app-w",w+"px");
+ document.documentElement.style.setProperty("--app-h",h+"px");
+}
+fitViewport(); window.addEventListener("orientationchange",()=>setTimeout(fitViewport,300));
+const N=[["C","ド",0],["C#","ド♯",1],["D","レ",2],["D#","レ♯",3],["E","ミ",4],["F","ファ",5],["F#","ファ♯",6],["G","ソ",7],["G#","ソ♯",8],["A","ラ",9],["A#","ラ♯",10],["B","シ",11]];
+const C=[["Maj",[0,4,7],"r"],["Min",[0,3,7],"r"],["Dim",[0,3,6],"r"],["Aug",[0,4,8],"r"],["7",[0,4,7,10],"g"],["Maj7",[0,4,7,11],"g"],["m7",[0,3,7,10],"g"],["m7b5",[0,3,6,10],"g"],["Add9",[0,4,7,14],"b"],["Add11",[0,4,7,17],"b"],["9",[0,4,7,10,14],"p"],["11",[0,4,7,10,14,17],"p"],["13",[0,4,7,10,14,17,21],"p"],["Slash",[0,4,7],"y"],["Clear",null,"gray"]];
+let chord=null,root=null,ctx=null,master=null,voices=new Map(),vtype="ep";
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+function svgData(text){
+ const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 60"><text x="90" y="39" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="white">'+text+'</text></svg>';
+ return "url('data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg)+"')";
+}
+C.forEach(([name,ints,cl])=>{
+ let b=document.createElement("button"); b.className="ch "+cl; b.setAttribute("aria-label",name);
+ b.style.backgroundImage=svgData(name);
+ if(name==="Clear"){b.onclick=()=>{chord=null;sync()}}
+ else{
+  b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture?.(e.pointerId);chord={ints,b,name};b.classList.add("active");sync()};
+  let u=e=>{e.preventDefault();if(chord?.b===b)chord=null;b.classList.remove("active");sync()};
+  b.onpointerup=u;b.onpointercancel=u;
+ }
+ $("#chords").appendChild(b);
+});
+function sync(){
+ $("#mode").textContent="コードモード："+(chord?chord.name:"なし");
+ $$(".note").forEach(n=>n.classList.remove("chordlit"));
+ if(chord&&root!==null) chord.ints.forEach(i=>$$('.note[data-pc="'+((root+i)%12)+'"]').forEach(n=>n.classList.add("chordlit")));
+}
+function wake(){
+ if(!ctx){ctx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:"interactive"});master=ctx.createGain();master.gain.value=.55;master.connect(ctx.destination)}
+ return ctx.state==="suspended"?ctx.resume():Promise.resolve();
+}
+function f(m){return 440*Math.pow(2,(m-69)/12)}
+function start(id,m){
+ if(voices.has(id))return;
+ let t=ctx.currentTime,g=ctx.createGain(),o=ctx.createOscillator(),o2=ctx.createOscillator();
+ g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.3,t+.004);g.gain.linearRampToValueAtTime(.12,t+1);g.gain.exponentialRampToValueAtTime(.045,t+3.8);
+ if(vtype==="8"){o.type=o2.type="square";o.frequency.value=f(m);o2.frequency.value=f(m)*2}else{o.type="triangle";o2.type="sine";o.frequency.value=f(m);o2.frequency.value=f(m)*2}
+ o.connect(g);o2.connect(g);g.connect(master);o.start(t);o2.start(t);voices.set(id,{g,o,o2});
+}
+function stop(id){
+ let v=voices.get(id);if(!v)return;let t=ctx.currentTime;
+ v.g.gain.cancelScheduledValues(t);v.g.gain.setValueAtTime(Math.max(.0001,v.g.gain.value),t);v.g.gain.setTargetAtTime(.0001,t,.022);
+ v.o.stop(t+.12);v.o2.stop(t+.12);voices.delete(id);
+}
+/* 五線譜：C4を五線譜下の加線1本上に置く標準的なト音記号系の位置。
+   各オクターブで7音階段上げ下げし、#は音符位置を変えずに表示する。 */
+function staffSVG(pc,oct){
+ const steps=[-6,-6,-5,-5,-4,-3,-3,-2,-2,-1,-1,0]; // C4..B4 relative to B4 reference
+ const s=steps[pc]+(oct-4)*7;
+ const y=28-s*2.35;
+ const sharp=(pc%2===1);
+ let lines="";for(let i=0;i<5;i++)lines+='<line x1="8" y1="'+(12+i*5)+'" x2="48" y2="'+(12+i*5)+'" stroke="white" stroke-width="1"/>';
+ let extra="";
+ if(y<12){for(let yy=7;yy>=y;yy-=5)extra+='<line x1="16" y1="'+yy+'" x2="40" y2="'+yy+'" stroke="white" stroke-width="1"/>'}
+ if(y>32){for(let yy=37;yy<=y;yy+=5)extra+='<line x1="16" y1="'+yy+'" x2="40" y2="'+yy+'" stroke="white" stroke-width="1"/>'}
+ return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 44">'+lines+extra+(sharp?'<text x="5" y="'+(y+4)+'" font-size="12" fill="white">♯</text>':'')+'<ellipse cx="31" cy="'+y+'" rx="4.5" ry="3.2" fill="white" transform="rotate(-20 31 '+y+')"/><line x1="35" y1="'+(y-2)+'" x2="35" y2="'+(y-15)+'" stroke="white" stroke-width="1.5"/></svg>';
+}
+function makeNotes(){
+ const wheel=$("#wheel"), radii=[43,25,14], octs=[3,4,5];
+ octs.forEach((oct,ri)=>N.forEach((n,pc)=>{
+  let b=document.createElement("button");b.className="note"+(n[2]?" black":"");b.dataset.pc=pc;b.dataset.oct=oct;
+  b.style.background=["#4b3a78","#3c6d6c","#e84c58","#6d3f68","#5c7944","#3b85cc","#37a3a3","#4f79bd","#a94e9f","#e2df43","#58a1e9","#e36b4d"][pc];
+  let a=(pc*30-90)*Math.PI/180,r=radii[ri];b.style.left=(50+r*Math.cos(a))+"%";b.style.top=(50+r*Math.sin(a))+"%";
+  b.innerHTML=staffSVG(pc,oct);
+  b.onpointerdown=async e=>{
+   e.preventDefault();b.setPointerCapture?.(e.pointerId);await wake();
+   /* 外周=3 OCTをキー選択にする */
+   if(oct===3){root=pc;$("#status").textContent="ルート："+n[0];sync()}
+   let base=oct*12+pc,ids=[];
+   if(chord){chord.ints.forEach((iv,k)=>{let id="c"+pc+"-"+oct+"-"+k;start(id,base+iv+12);ids.push(id)})}
+   else{let id="n"+pc+"-"+oct;start(id,base+12);ids.push(id)}
+   b.dataset.ids=ids.join(",");b.classList.add("active");
+  };
+  let u=e=>{e.preventDefault();(b.dataset.ids||"").split(",").filter(Boolean).forEach(stop);b.dataset.ids="";b.classList.remove("active")};
+  b.onpointerup=u;b.onpointercancel=u;b.onpointerleave=e=>{if(e.buttons===0)u(e)};
+  wheel.appendChild(b);
+  /* 最外周のさらに外に名称を配置 */
+  if(oct===3){
+   let l=document.createElement("div");l.className="label";let rr=53;
+   l.style.left=(50+rr*Math.cos(a))+"%";l.style.top=(50+rr*Math.sin(a))+"%";
+   l.innerHTML='<span class="jp">'+n[1]+'</span><span class="en">'+n[0]+'</span>';
+   wheel.appendChild(l);
+  }
+ }));
+}
+$$('input[name="v"]').forEach(x=>x.onchange=()=>vtype=x.value);
+makeNotes();sync();
+</script></body></html>
