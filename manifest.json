@@ -1,0 +1,17 @@
+{
+  "name": "Chromatic Electric Piano v6",
+  "short_name": "Chromatic Piano",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050608",
+  "theme_color": "#15171d",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
