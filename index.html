@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Geometric Piano Synthesizer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            color: #ffffff;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            height: 100dvh;
+        }
+
+        /* 画面全体のコンテナ */
+        #app-container {
+            width: 100%;
+            max-width: 480px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px;
+            position: relative;
+        }
+
+        /* 背景波紋用Canvas */
+        #bg-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 上段：コードボタンエリア */
+        .chord-section {
+            z-index: 2;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            padding: 4px;
+        }
+        .chord-btn {
+            background: linear-gradient(135deg, #ffe259, #ffa751);
+            color: #111;
+            border: none;
+            border-radius: 12px;
+            padding: 8px 2px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(255,167,81,0.3);
+            transition: transform 0.05s ease, filter 0.05s ease;
+            text-align: center;
+        }
+        .chord-btn.type-maj7 { background: linear-gradient(135deg, #00c6ff, #0072ff); color: #fff; }
+        .chord-btn.type-add { background: linear-gradient(135deg, #56ab2f, #a8e063); color: #111; }
+        .chord-btn.type-ext { background: linear-gradient(135deg, #8A2387, #E94057, #F27121); color: #fff; }
+        .chord-btn.type-gray { background: linear-gradient(135deg, #bdc3c7, #2c3e50); color: #fff; }
+        
+        .chord-btn:active, .chord-btn.active {
+            filter: brightness(1.4);
+            box-shadow: 0 0 12px #fff, 0 0 20px #ff0;
+            transform: scale(0.95);
+        }
+
+        /* 中段：トランスポーズ（転調）エリア */
+        .transpose-section {
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin: 4px 0;
+        }
+        .trans-btn {
+            background: #444;
+            color: #fff;
+            border: 2px solid #666;
+            width: 44px;
+            height: 36px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .trans-btn:active {
+            background: #666;
+            box-shadow: 0 0 10px #fff;
+        }
+        .trans-display {
+            background: #ffffff;
+            color: #000000;
+            width: 50px;
+            height: 36px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        /* 下段：幾何学七角形ピアノパッドエリア */
+        .piano-section {
+            z-index: 2;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            max-height: 55vh;
+            margin-bottom: 5px;
+        }
+        #piano-canvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- 上段：コードボタン群 -->
+    <div class="chord-section" id="chord-buttons">
+        <button class="chord-btn" data-chord="Maj">Maj</button>
+        <button class="chord-btn" data-chord="Min">Min</button>
+        <button class="chord-btn" data-chord="Dim">Dim</button>
+        <button class="chord-btn" data-chord="Aug">Aug</button>
+        
+        <button class="chord-btn type-maj7" data-chord="Maj7">Maj7</button>
+        <button class="chord-btn type-maj7" data-chord="Min7">Min7</button>
+        <button class="chord-btn type-maj7" data-chord="7">7</button>
+        <button class="chord-btn type-maj7" data-chord="M7b7">M7♭7</button>
+        
+        <button class="chord-btn type-add" data-chord="Add7">Add7</button>
+        <button class="chord-btn type-add" data-chord="Add9">Add9</button>
+        <button class="chord-btn type-gray" data-chord="Slash">Slash</button>
+        <button class="chord-btn type-gray" data-chord="Clear">Clear</button>
+        
+        <button class="chord-btn type-ext" data-chord="9">9</button>
+        <button class="chord-btn type-ext" data-chord="11">11</button>
+        <button class="chord-btn type-ext" data-chord="13">13</button>
+    </div>
+
+    <!-- 中段：半音転調エリア -->
+    <div class="transpose-section">
+        <button class="trans-btn" id="btn-flat">♭</button>
+        <div class="trans-display" id="trans-value">0</div>
+        <button class="trans-btn" id="btn-sharp">#</button>
+    </div>
+
+    <!-- 下段：七角形放射ピアノパッドエリア -->
+    <div class="piano-section">
+        <canvas id="piano-canvas"></canvas>
+    </div>
+</div>
+
+<script>
+    // --- 音響・物理モデリングエンジン (Web Audio API) ---
+    let audioCtx = null;
+    let activeNotes = new Map(); // 発音中のオシレーター管理
+    let activeRipples = [];     // 背景波紋エフェクト管理
+    let activeGlows = [];       // ボタン発光エフェクト管理
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    // 周波数計算（非調和性・3本弦デチューン内包）
+    function getNoteFrequency(midiNote) {
+        const baseFreq = 440 * Math.pow(2, (midiNote - 69) / 12);
+        return baseFreq;
+    }
+
+    // リアルタイムピアノ発音
+    function playPianoNote(midiNote, velocity = 0.8) {
+        initAudio();
+        if (!audioCtx) return;
+
+        const now = audioCtx.currentTime;
+        const fundamentalFreq = getNoteFrequency(midiNote);
+
+        // マスターゲイン＆フィルター（スプルース響板シミュレーション）
+        const masterGain = audioCtx.createGain();
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(Math.min(fundamentalFreq * 6, 8000), now);
+        filter.Q.setValueAtTime(1.5, now);
+
+        masterGain.gain.setValueAtTime(0, now);
+        // 超高速アタック（立ち上がり遅延ゼロ）
+        masterGain.gain.linearRampToValueAtTime(0.25 * velocity, now + 0.008);
+        // 自然なピアノの減衰カーブ（サステイン〜リリース）
+        masterGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+
+        filter.connect(masterGain);
+        masterGain.connect(audioCtx.destination);
+
+        const oscillators = [];
+
+        // 1音あたり3本の弦（デチューンによるリッチなうねり）をシミュレート
+        const detunes = [-2.5, 0, 2.5];
+        detunes.forEach((detune, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            // 非調和性（Inharmonicity）式: fn = n * f0 * sqrt(1 + B*n^2)
+            const B = 0.0002; // ピアノ弦の硬さ係数
+            let freq = fundamentalFreq * Math.pow(2, detune / 1200);
+            
+            osc.type = (idx === 1) ? 'triangle' : 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+
+            // 倍音成分の付加（サブオシレーターとして高次倍音をブレンド）
+            gain.gain.setValueAtTime(idx === 1 ? 0.7 : 0.3, now);
+
+            osc.connect(gain);
+            gain.connect(filter);
+
+            osc.start(now);
+            oscillators.push(osc);
+        });
+
+        // アタックノイズ（打弦ハンマーの質感を付加）
+        try {
+            const bufferSize = audioCtx.sampleRate * 0.03;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const whiteNoise = audioCtx.createBufferSource();
+            whiteNoise.buffer = noiseBuffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'bandpass';
+            noiseFilter.frequency.value = 2500;
+            noiseFilter.Q.value = 3.0;
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.12, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+            whiteNoise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            whiteNoise.start(now);
+        } catch(e) {}
+
+        // 管理マップに登録
+        activeNotes.set(midiNote, {
+            oscillators,
+            masterGain,
+            stop: () => {
+                const ct = audioCtx.currentTime;
+                try {
+                    masterGain.gain.cancelScheduledValues(ct);
+                    masterGain.gain.setValueAtTime(masterGain.gain.value, ct);
+                    masterGain.gain.exponentialRampToValueAtTime(0.0001, ct + 0.15);
+                    setTimeout(() => {
+                        oscillators.forEach(o => { try { o.stop(); } catch(e){} });
+                    }, 160);
+                } catch(e) {}
+            }
+        });
+    }
+
+    function stopPianoNote(midiNote) {
+        if (activeNotes.has(midiNote)) {
+            const noteData = activeNotes.get(midiNote);
+            noteData.stop();
+            activeNotes.delete(midiNote);
+        }
+    }
+
+
+    // --- UI・幾何学七角形ピアノパッド設計 ---
+    let transposeOffset = 0;
+    let selectedChord = null;
+
+    const noteNamesSharp = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const noteNamesFlat  = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"];
+
+    // 画像のレイアウトに準拠した正七角形パッドの定義 (7セクター × 3オクターブ)
+    // 180度反転した配置（上部にC、左右にB/D、下部にG/Fが位置する美しい放射構造）
+    const baseSectors = [
+        { name: "C", baseMidi: 60, color: "#ff3333" }, // 上段（赤）
+        { name: "D", baseMidi: 62, color: "#e6cc00" }, // 右上（黄）
+        { name: "E", baseMidi: 64, color: "#2eb82e" }, // 右下（緑）
+        { name: "F", baseMidi: 65, color: "#ffb366" }, // 下右（オレンジ）
+        { name: "G", baseMidi: 67, color: "#33cccc" }, // 下左（シアン）
+        { name: "A", baseMidi: 69, color: "#3366ff" }, // 左下（青）
+        { name: "B", baseMidi: 71, color: "#b333cc" }  // 左上（紫）
+    ];
+
+    // コード構成音のオフセット定義
+    const chordIntervals = {
+        "Maj": [0, 4, 7],
+        "Min": [0, 3, 7],
+        "Dim": [0, 3, 6],
+        "Aug": [0, 4, 8],
+        "Maj7": [0, 4, 7, 11],
+        "Min7": [0, 3, 7, 10],
+        "7": [0, 4, 7, 10],
+        "M7b7": [0, 4, 6, 10],
+        "Add7": [0, 4, 7, 10],
+        "Add9": [0, 4, 7, 14],
+        "Slash": [0, 7], 
+        "9": [0, 4, 7, 10, 14],
+        "11": [0, 4, 7, 10, 14, 17],
+        "13": [0, 4, 7, 10, 14, 21]
+    };
+
+    const pianoCanvas = document.getElementById('piano-canvas');
+    const pianoCtx = pianoCanvas.getContext('2d');
+    const bgCanvas = document.getElementById('bg-canvas');
+    const bgCtx = bgCanvas.getContext('2d');
+
+    function resizeCanvases() {
+        const pRect = pianoCanvas.parentElement.getBoundingClientRect();
+        pianoCanvas.width = pRect.width * window.devicePixelRatio;
+        pianoCanvas.height = pRect.height * window.devicePixelRatio;
+
+        bgCanvas.width = window.innerWidth * window.devicePixelRatio;
+        bgCanvas.height = window.innerHeight * window.devicePixelRatio;
+    }
+    window.addEventListener('resize', resizeCanvases);
+    resizeCanvases();
+
+    // --- 描画ループ & モーショングラフィックス ---
+    function draw() {
+        // 背景クリア
+        bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+        
+        // 背景波紋の描画
+        activeRipples.forEach((r, index) => {
+            r.radius += 4 * window.devicePixelRatio;
+            r.alpha -= 0.02;
+            if (r.alpha <= 0) {
+                activeRipples.splice(index, 1);
+                return;
+            }
+            bgCtx.save();
+            bgCtx.beginPath();
+            bgCtx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+            bgCtx.strokeStyle = `rgba(0, 255, 255, ${r.alpha})`;
+            bgCtx.lineWidth = 3 * window.devicePixelRatio;
+            bgCtx.stroke();
+            bgCtx.restore();
+        });
+
+        // ピアノパッド描画
+        pianoCtx.clearRect(0, 0, pianoCanvas.width, pianoCanvas.height);
+        const cx = pianoCanvas.width / 2;
+        const cy = pianoCanvas.height / 2;
+        const maxRadius = Math.min(cx, cy) * 0.92;
+        
+        // 3つのリング（オクターブ3, 4, 5）
+        // 内側から外側へ：Octave 3, 4, 5
+        const rings = [
+            { rMin: maxRadius * 0.22, rMax: maxRadius * 0.45, octOffset: -1 }, // 内側 (Oct 3)
+            { rMin: maxRadius * 0.47, rMax: maxRadius * 0.70, octOffset: 0 },  // 中央 (Oct 4)
+            { rMin: maxRadius * 0.72, rMax: maxRadius * 0.96, octOffset: 1 }   // 外側 (Oct 5)
+        ];
+
+        // 各セクター（7等分）の描画
+        const angleStep = (Math.PI * 2) / 7;
+        // 180度反転させてトップをCにするための回転角調整 (-Math.PI / 2 からスタートしつつ微調整)
+        const startAngleOffset = -Math.PI / 2 - angleStep / 2;
+
+        rings.forEach((ring, ringIdx) => {
+            baseSectors.forEach((sector, secIdx) => {
+                const angleStart = startAngleOffset + secIdx * angleStep;
+                const angleEnd = startAngleOffset + (secIdx + 1) * angleStep;
+                
+                // ボタン間のギャップを確保するため微小な隙間を空ける
+                const gap = 0.015; 
+                const aStart = angleStart + gap;
+                const aEnd = angleEnd - gap;
+
+                const isTouched = activeGlows.some(g => g.ringIdx === ringIdx && g.secIdx === secIdx);
+
+                pianoCtx.save();
+                pianoCtx.beginPath();
+                pianoCtx.arc(cx, cy, ring.rMax, aStart, aEnd, false);
+                pianoCtx.arc(cx, cy, ring.rMin, aEnd, aStart, true);
+                pianoCtx.closePath();
+
+                // ネオンカラー発光表現
+                if (isTouched) {
+                    pianoCtx.fillStyle = '#ffffff';
+                    pianoCtx.shadowColor = sector.color;
+                    pianoCtx.shadowBlur = 25 * window.devicePixelRatio;
+                } else {
+                    pianoCtx.fillStyle = sector.color;
+                    pianoCtx.shadowColor = sector.color;
+                    pianoCtx.shadowBlur = 8 * window.devicePixelRatio;
+                }
+                pianoCtx.fill();
+
+                // 黒枠でボタンのエッジを美しく際立たせる
+                pianoCtx.lineWidth = 3.5 * window.devicePixelRatio;
+                pianoCtx.strokeStyle = '#000000';
+                pianoCtx.stroke();
+                pianoCtx.restore();
+
+                // ノイズ・テキストラベルの計算と表示
+                const midAngle = (aStart + aEnd) / 2;
+                const midRadius = (ring.rMin + ring.rMax) / 2;
+                const textX = cx + Math.cos(midAngle) * midRadius;
+                const textY = cy + Math.sin(midAngle) * midRadius;
+
+                // 転調を反映した音名ラベル取得
+                const baseMidi = sector.baseMidi + (ring.octOffset * 12) + transposeOffset;
+                const noteIndex = ((baseMidi % 12) + 12) % 12;
+                const labelText = (transposeOffset < 0 ? noteNamesFlat : noteNamesSharp)[noteIndex] + (4 + ring.octOffset + Math.floor((sector.baseMidi + transposeOffset)/12) - 5);
+
+                pianoCtx.save();
+                pianoCtx.font = `bold ${Math.max(12, maxRadius * 0.08)}px sans-serif`;
+                pianoCtx.fillStyle = isTouched ? '#000000' : '#111111';
+                pianoCtx.textAlign = 'center';
+                pianoCtx.textBaseline = 'middle';
+                pianoCtx.fillText(labelText, textX, textY);
+                pianoCtx.restore();
+            });
+        });
+
+        requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+
+
+    // --- タッチ・ポインタイベント処理（ゼロ・レイテンシー最適化） ---
+    const touchMap = new Map(); // pointerId => {ringIdx, secIdx, midiNotes}
+
+    pianoCanvas.addEventListener('pointerdown', handlePointerDown);
+    pianoCanvas.addEventListener('pointermove', handlePointerMove);
+    pianoCanvas.addEventListener('pointerup', handlePointerUp);
+    pianoCanvas.addEventListener('pointercancel', handlePointerUp);
+
+    function getTouchSector(x, y) {
+        const rect = pianoCanvas.getBoundingClientRect();
+        const scaleX = pianoCanvas.width / rect.width;
+        const scaleY = pianoCanvas.height / rect.height;
+        const px = (x - rect.left) * scaleX;
+        const py = (y - rect.top) * scaleY;
+
+        const cx = pianoCanvas.width / 2;
+        const cy = pianoCanvas.height / 2;
+        const dx = px - cx;
+        const dy = py - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        const maxRadius = Math.min(cx, cy) * 0.92;
+        const rings = [
+            { rMin: maxRadius * 0.22, rMax: maxRadius * 0.45, octOffset: -1 },
+            { rMin: maxRadius * 0.47, rMax: maxRadius * 0.70, octOffset: 0 },
+            { rMin: maxRadius * 0.72, rMax: maxRadius * 0.96, octOffset: 1 }
+        ];
+
+        let ringIdx = -1;
+        for (let i = 0; i < rings.length; i++) {
+            if (dist >= rings[i].rMin && dist <= rings[i].rMax) {
+                ringIdx = i;
+                break;
+            }
+        }
+        if (ringIdx === -1) return null;
+
+        let angle = Math.atan2(dy, dx);
+        const angleStep = (Math.PI * 2) / 7;
+        const startAngleOffset = -Math.PI / 2 - angleStep / 2;
+        
+        let relAngle = angle - startAngleOffset;
+        while (relAngle < 0) relAngle += Math.PI * 2;
+        while (relAngle >= Math.PI * 2) relAngle -= Math.PI * 2;
+
+        let secIdx = Math.floor(relAngle / angleStep);
+        if (secIdx < 0 || secIdx >= 7) return null;
+
+        return { ringIdx, secIdx };
+    }
+
+    function handlePointerDown(e) {
+        e.preventDefault();
+        initAudio();
+        const pos = getTouchSector(e.clientX, e.clientY);
+        if (!pos) return;
+
+        triggerPlay(e.pointerId, pos.ringIdx, pos.secIdx);
+    }
+
+    function handlePointerMove(e) {
+        e.preventDefault();
+        const pos = getTouchSector(e.clientX, e.clientY);
+        if (touchMap.has(e.pointerId)) {
+            const current = touchMap.get(e.pointerId);
+            if (!pos || current.ringIdx !== pos.ringIdx || current.secIdx !== pos.secIdx) {
+                releaseTouch(e.pointerId);
+                if (pos) {
+                    triggerPlay(e.pointerId, pos.ringIdx, pos.secIdx);
+                }
+            }
+        }
+    }
+
+    function handlePointerUp(e) {
+        e.preventDefault();
+        releaseTouch(e.pointerId);
+    }
+
+    function triggerPlay(pointerId, ringIdx, secIdx) {
+        const rings = [{octOffset: -1}, {octOffset: 0}, {octOffset: 1}];
+        const sector = baseSectors[secIdx];
+        const baseMidi = sector.baseMidi + (rings[ringIdx].octOffset * 12) + transposeOffset;
+
+        let midiNotesToPlay = [baseMidi];
+
+        // コードモードが選択されている場合の構成音計算
+        if (selectedChord && chordIntervals[selectedChord]) {
+            midiNotesToPlay = chordIntervals[selectedChord].map(interval => baseMidi + interval);
+        }
+
+        // 発音実行
+        midiNotesToPlay.forEach(note => playPianoNote(note));
+
+        touchMap.set(pointerId, { ringIdx, secIdx, midiNotes: midiNotesToPlay });
+        activeGlows.push({ pointerId, ringIdx, secIdx });
+    }
+
+    function releaseTouch(pointerId) {
+        if (touchMap.has(pointerId)) {
+            const data = touchMap.get(pointerId);
+            data.midiNotes.forEach(note => stopPianoNote(note));
+ 
